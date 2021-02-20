@@ -1,4 +1,4 @@
-FROM ghcr.io/linuxserver/baseimage-ubuntu:bionic
+FROM ghcr.io/linuxserver/baseimage-ubuntu:focal
 
 # set version label
 ARG BUILD_DATE
@@ -8,44 +8,34 @@ LABEL maintainer="ssawka"
 
 # environment variables
 ARG DEBIAN_FRONTEND="noninteractive"
-ARG MOPIDY_EXTENSIONS=""
-
-# ENV PYTHON_EGG_CACHE="/config/plugins/.python-eggs"
 
 # install software
-RUN \
- echo "**** update OS ****" && \
- apt-get update && \
- apt-get upgrade -y \
- echo "**** install python3 ****" && \
- apt-get update && \
- apt-get install -y \
- 	build-essential \
-	python3-dev \
-	python3-pip && \
- echo "**** install GStreamer ****" && \
- apt-get install -y \
-	python3-gst-1.0 \
-    gir1.2-gstreamer-1.0 \
-    gir1.2-gst-plugins-base-1.0 \
-    gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-ugly \
-    gstreamer1.0-tools && \
- echo "**** install Mopidy ****" && \
- python3 -m pip install --upgrade mopidy && \
- echo "**** install Mopidy ****" && \
- for ext in $MOPIDY_EXTENSIONS ; do \
- 	python3 -m pip install $ext ; \
- done
-#echo "**** cleanup ****" && \
-#rm -rf \cd
-#	/tmp/* \
-#	/var/lib/apt/lists/* \
-#	/var/tmp/*
+RUN echo "**** update OS ****" && \
+    apt-get update && \
+    apt-get upgrade -y
+
+RUN echo "**** Install support packages ****" && \
+    apt-get install -y wget build-essential python3-dev python3-pip
+
+RUN echo "**** Add the archive’s GPG key ****" && \
+    wget -q -O - https://apt.mopidy.com/mopidy.gpg | apt-key add - && \
+    echo "**** Add the APT repo to your package sources ****" && \
+    wget -q -O /etc/apt/sources.list.d/mopidy.list https://apt.mopidy.com/buster.list
+
+RUN echo "**** Install Mopidy and all dependencies ****" && \
+    apt-get -y update && \
+    python3 -m pip install --upgrade pip && \
+    apt-get install -y mopidy
+
+Run echo "**** Create alternative directories ****" && \
+    mkdir -p /cache && \
+    mkdir -p /config && \
+    mkdir -p /data && \
+    mkdir -p /music
 
 # add local files
-# COPY root/ /
+COPY root/ /
 
 # ports and volumes
-# EXPOSE 8112 58846 58946 58946/udp
-# VOLUME /config /downloads
+EXPOSE 6680
+VOLUME /config /data /music

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+export HOME=~abc
+export PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+CONFIG_FILES="/config"
+
+mopidy --quiet --config "${CONFIG_FILES}"

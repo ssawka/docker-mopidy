@@ -1,7 +1,54 @@
 #!/usr/bin/with-contenv bash
 
-# permissions
-chown -R abc:abc \
-	/config
-chown abc:abc \
-	/downloads
+# Set variables
+INT_RE='^[0-9]+$'
+
+# Replace Mopidy user, if it still exists
+MOPIDY_UID=$(id -u mopidy 2> /dev/null)
+if [[ "${MOPIDY_UID}" =~ "${INT_RE}" ]] ; then
+    find / -uid $MOPIDY_UID -exec chown abc {} \;
+    userdel mopidy
+fi
+
+# Replace Mopidy group, if it still exists
+MOPIDY_GID=$(id -g mopidy 2> /dev/null)
+if [[ "${MOPIDY_GID}" =~ "${INT_RE}" ]] ; then
+    find / -gid $MOPIDY_GID -exec chgrp abc {} \;
+fi
+
+# Install additional packages, if needed
+if [ -n "${ADDITIONAL_PACKAGES}" ] ; then
+    apt-get update -y
+    for PKG in ${ADDITIONAL_PACKAGES}; do
+        apt-get install -y ${PKG}
+    done
+fi
+
+# Install additional Mopidy extensions, if needed
+if [ -n "${MOPIDY_EXTENSIONS}" ] ; then
+    for EXT in ${MOPIDY_EXTENSIONS}; do
+        python3 -m pip install --upgrade ${EXT}
+    done
+fi
+
+# Make sure Mopidy working directories exist
+[ -d /cache ] || mkdir /cache
+[ -d /config ] || mkdir /config
+[ -d /data ] || mkdir /data
+
+# Copy and modify Mopidy's configuration files, if they do not exist in /config
+if [[ ! -e /config/mopidy.conf ]] ; then
+    cp /usr/share/mopidy/conf.d/* /config
+    sed -i '/^cache_dir\s*=/ s/=.*$/= \/cache/' /config/mopidy.conf
+    sed -i '/^config_dir\s*=/ s/=.*$/= \/config/' /config/mopidy.conf
+    sed -i '/^data_dir\s*=/ s/=.*$/= \/data/' /config/mopidy.conf
+fi
+
+# Ensure everything under the Mopidy working directories is owned by abc
+chown -R abc:abc /cache
+chown -R abc:abc /config
+chown -R abc:abc /data
+
+# Ensure proper permissions on all Mopidy files
+chmod +r /etc/mopidy/mopidy.conf
+chmod +x /usr/local/bin/start-mopidy
