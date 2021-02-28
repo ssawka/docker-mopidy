@@ -6,8 +6,16 @@ ARG VERSION
 LABEL build_version="Linuxserver.io version:- ${VERSION} Build-date:- ${BUILD_DATE}"
 LABEL maintainer="ssawka"
 
-# environment variables
+# argument variables
 ARG DEBIAN_FRONTEND="noninteractive"
+
+# environment variables
+ENV WAIT_FOR=""
+ENV WAIT_FOR_HOST=""
+ENV WAIT_FOR_PORT=""
+ENV WAIT_FOR_TIMEOUT=5
+ENV WAIT_FOR_SLEEP=5
+ENV WAIT_FOR_RETRIES=10
 
 # install software
 RUN echo "**** update OS ****" && \
@@ -37,5 +45,5 @@ Run echo "**** Create alternative directories ****" && \
 COPY root/ /
 
 # ports and volumes
-EXPOSE 6680
+EXPOSE 6600 6680
 VOLUME /config /data /music

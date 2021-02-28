@@ -1,0 +1,84 @@
+#!/usr/bin/with-contenv bash
+
+ME="$(readlink -e "${0}")"
+SCRIPT_NAME="${ME##*/}"
+
+declare -A DEFAULT=(
+    [HOST]=""
+    [PORT]=""
+    [TIMEOUT]=5
+    [SLEEP]=5
+    [RETRIES]=10
+)
+
+# Host
+WAIT_FOR_HOST="${WAIT_FOR_HOST:-${DEFAULT[HOST]}}"
+WAIT_FOR_HOST=( ${WAIT_FOR_HOST} )
+[ -n "${WAIT_FOR_HOSTS+x}" ] && WAIT_FOR_HOST+=( ${WAIT_FOR_HOSTS} )
+
+# Port
+WAIT_FOR_PORT="${WAIT_FOR_PORT:-${DEFAULT[PORT]}}"
+WAIT_FOR_PORT=( ${WAIT_FOR_PORT} )
+[ -n "${WAIT_FOR_PORTS+x}" ] && WAIT_FOR_PORT+=( ${WAIT_FOR_PORTS} )
+
+# WAIT_FOR (combined host and port)
+if [[ -n "${WAIT_FOR+x}" ]]; then
+    RE="^\s*([a-zA-z0-9-.]+):([0-9]+)\s*$"
+    for ENTRY in ${WAIT_FOR} ; do
+        if [[ "${ENTRY}" =~ ${RE} ]]; then
+            WAIT_FOR_HOST+=( ${BASH_REMATCH[1]} )
+            WAIT_FOR_PORT+=( ${BASH_REMATCH[2]} )
+        fi
+    done
+fi
+
+# Validate counts
+if [[ "${#WAIT_FOR_HOST[@]}" != "${#WAIT_FOR_PORT[@]}" ]]; then
+    echo "WAIT_FOR: Host and port counts do not match" 1>&2
+    exit 1
+fi
+
+INT_RE="^[0-9]+$"
+
+# Timeout
+WAIT_FOR_TIMEOUT="${WAIT_FOR_TIMEOUT:-${DEFAULT[TIMEOUT]}}" 
+if [[ ! "${WAIT_FOR_TIMEOUT}" =~ ${INT_RE} ]]; then
+    echo "WAIT_FOR: WAIT_FOR_TIMEOUT is not an integer greater than or equal to zero.  Using default of ${DEFAULT[TIMEOUT]}" 1>&2
+    WAIT_FOR_TIMEOUT="${DEFAULT[TIMEOUT]}"
+fi
+
+# Sleep
+WAIT_FOR_SLEEP="${WAIT_FOR_SLEEP:-${DEFAULT[SLEEP]}}" 
+if [[ ! "${WAIT_FOR_SLEEP}" =~ ${INT_RE} ]]; then
+    echo "WAIT_FOR: WAIT_FOR_SLEEP is not an integer greater than or equal to zero.  Using default of ${DEFAULT[SLEEP]}" 1>&2
+    WAIT_FOR_SLEEP="${DEFAULT[SLEEP]}"
+fi
+
+# Retries
+WAIT_FOR_RETRIES="${WAIT_FOR_RETRIES:-${DEFAULT[RETRIES]}}"
+if [[ ! "${WAIT_FOR_RETRIES}" =~ ${INT_RE} ]]; then
+    echo "WAIT_FOR: WAIT_FOR_RETRIES is not an integer greater than or equal to zero.  Using default of ${DEFAULT[RETRIES]}" 1>&2
+    WAIT_FOR_RETRIES="${DEFAULT[RETRIES]}"
+fi
+
+# Wait for ports to be opened
+HOST_INDEX=0
+while [ "${HOST_INDEX}" -lt "${#WAIT_FOR_HOST[@]}" ]; do
+    HOST="${WAIT_FOR_HOST[$HOST_INDEX]}"
+    PORT="${WAIT_FOR_PORT[$HOST_INDEX]}"
+    TRY_COUNT=0
+    RETRY=true
+    while [ "${RETRY}" -eq "true" ]; do
+        nc -z -v -w ${WAIT_FOR_TIMEOUT} ${HOST} ${PORT}
+        if (( $? == 0  )); then
+            RETRY=false
+        else
+            TRY_COUNT+=1
+            if (( $TRY_COUNT > $WAIT_FOR_RETRIES )); then
+                echo "${SCRIPT_NAME}: Max number of retries reached for ${HOST}:${PORT}" 1>&2
+                RETRY=false
+            fi
+        fi
+    done
+    HOST_INDEX+=1
+done
